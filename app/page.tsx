@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { ChatBox } from '@/components/ChatBox'
 import { RecordsPanel } from '@/components/RecordsPanel'
 import { AppState, Message, INITIAL_STATE } from '@/lib/types'
@@ -129,7 +130,19 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen bg-white">
       <header className="border-b px-4 py-4 flex items-center justify-between bg-white">
-        <h1 className="text-xl font-semibold text-gray-900">安心睡眠伙伴 - 你的睡前思绪整理助手</h1>
+        <div className="flex items-center gap-2">
+          <Image
+            src="/site-icon.png"
+            alt="安心睡眠伙伴图标"
+            width={32}
+            height={32}
+            className="rounded-md"
+            priority
+          />
+          <h1 className="text-xl font-semibold text-gray-900">
+            安心睡眠伙伴 - 你的睡前思绪整理助手
+          </h1>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
