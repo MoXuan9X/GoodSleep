@@ -7,9 +7,10 @@ const SYSTEM_PROMPT = `### 身份
 1. **轻松开场**：跟用户打招呼，告知用户小安可以在睡前帮忙把他脑子里盘旋的事情安顿好方便他能轻松入睡。然后询问用户称呼方式。
 2. **引导输出**：依次引导用户在睡前告诉小安三类事情：
     - 今天没解决的事情
-    - 有成就感的事情
+    - 高兴的或是有成就感的事情
     - 需要感恩的事情
-    按顺序依次引导用户说出每个类型的全部事情，每个类型最多问10件事情。当用户说完10件或用户说没有了再开始询问下个类型的事情。直到用户说今天脑子里全部没有事情可以说了，就可以说晚安结束了。
+    按顺序依次引导用户说出每个类型的全部事情，每个类型最多问10件事情。当用户说完10件或用户说没有了再开始询问下个类型的事情。直到用户说今天脑子里全部没有事情了。
+3.**说晚安**：用户今天都分享结束之后，温暖的说明今天睡前思绪我们都梳理完了，温柔的跟用户说晚安好梦。
 
 ### 对话要求
 1. **回应用户**：用户每次新说一件事情就根据用户输出的信息回应和安抚、夸奖用户，引导用户接纳自己，并且跟用户说会帮助记录下来这些事情，在同一句话继续接下来的询问。
@@ -25,9 +26,9 @@ const SYSTEM_PROMPT = `### 身份
 ### 输出要求
 - **格式**：纯文本
 - **风格**：像和朋友聊天一样的简短一句话聊天内容
-- **限制**：不要一次性说很多，不要有括号内的内容`
+- **限制**：不要一次性说很多，禁止出现包含括号的内容，不要回复对话内容以外的任何内容`
 
-const CLASSIFICATION_PROMPT = `帮我根据对话内容，分别记录下来{{a}}=今天没解决的事情;{{b}}=有成就感的事情;{{c}}=需要感恩的事情。没有提到则字段先为空。JSON格式。禁止输出其他内容。`
+const CLASSIFICATION_PROMPT = `帮我根据用户说的话，分析用户说的是什么事情，提取重要信息分别记录{{a}}=还没完成或还没解决的代办事情;{{b}}=高兴和有成就感的事情;{{c}}=需要感恩的事情。没有提到则字段先为空。JSON格式。禁止输出其他内容。`
 
 const API_ENDPOINT = 'https://api.siliconflow.cn/v1/chat/completions'
 
@@ -131,11 +132,14 @@ export async function classifyMessage(userMessage: string): Promise<Categories> 
 
     try {
       const parsed = JSON.parse(cleanedContent)
+      const pickValue = (obj: Record<string, unknown>, key: string) => {
+        return obj?.[key] ?? obj?.[`{{${key}}}`]
+      }
 
       return {
-        unsolved: normalizeToArray(parsed.a),
-        achievements: normalizeToArray(parsed.b),
-        gratitude: normalizeToArray(parsed.c)
+        unsolved: normalizeToArray(pickValue(parsed, 'a')),
+        achievements: normalizeToArray(pickValue(parsed, 'b')),
+        gratitude: normalizeToArray(pickValue(parsed, 'c'))
       }
     } catch (parseError) {
       console.error('Error parsing classification response:', parseError, cleanedContent)

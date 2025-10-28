@@ -8,10 +8,31 @@ import { AppState, Message, INITIAL_STATE } from '@/lib/types'
 import { loadState, saveState, clearState } from '@/lib/storage'
 import { getChatResponse, classifyMessage } from '@/lib/api'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, Menu, X } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@/components/ui/tooltip'
 
 const GREETING_MESSAGE = '你好！我是小安，可以在睡前帮你把脑子里盘旋的事情安顿好，让你轻松入睡。请问怎么称呼你呢？'
+const COMPLETION_KEYWORDS = [
+  '没有了',
+  '没了',
+  '没有其它',
+  '没有其他',
+  '没有别的',
+  '没有什么了',
+  '没有什么别的',
+  '分享完了',
+  '讲完了',
+  '说完了',
+  '结束了',
+  '没有问题了',
+  '没有什么问题了',
+  '晚安'
+]
 
 export default function Home() {
   const [state, setState] = useState<AppState>(INITIAL_STATE)
@@ -40,7 +61,7 @@ export default function Home() {
   }, [])
 
   const mergeCategories = (existing: string[], newItems: string[]): string[] => {
-    const merged = [...existing]
+    const merged = existing.filter(item => item && item.trim()).map(item => item.trim())
     newItems.forEach(item => {
       if (item && item.trim() && !merged.includes(item.trim())) {
         merged.push(item.trim())
@@ -50,6 +71,14 @@ export default function Home() {
   }
 
   const handleSendMessage = async (message: string) => {
+    if (state.conversationProgress.isCompleted) {
+      toast({
+        title: '会话已结束',
+        description: '点击“开始新会话”即可重新聊天。'
+      })
+      return
+    }
+
     const userMessage: Message = {
       role: 'user',
       content: message,
@@ -66,10 +95,14 @@ export default function Home() {
     setIsLoading(true)
 
     try {
-      const [assistantResponse, classification] = await Promise.all([
-        getChatResponse(updatedHistory),
-        classifyMessage(message)
-      ])
+      const assistantResponse = await getChatResponse(updatedHistory)
+
+      const classificationInput = `用户: ${message}\n小安: ${assistantResponse}`
+      const normalizedMessage = message.replace(/\s/g, '')
+      const isCompletionMessage = COMPLETION_KEYWORDS.some(keyword =>
+        normalizedMessage.includes(keyword)
+      )
+      const classification = await classifyMessage(classificationInput)
 
       const assistantMessage: Message = {
         role: 'assistant',
@@ -85,7 +118,11 @@ export default function Home() {
             achievements: mergeCategories(prev.categories.achievements, classification.achievements),
             gratitude: mergeCategories(prev.categories.gratitude, classification.gratitude)
           },
-          conversationProgress: prev.conversationProgress
+          conversationProgress: {
+            ...prev.conversationProgress,
+            currentCategory: isCompletionMessage ? 'completed' : prev.conversationProgress.currentCategory,
+            isCompleted: prev.conversationProgress.isCompleted || isCompletionMessage
+          }
         }
 
         saveState(newState)
@@ -143,24 +180,53 @@ export default function Home() {
             安心睡眠伙伴 - 你的睡前思绪整理助手
           </h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleReset}
-            title="开始新会话"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setShowRecords(!showRecords)}
-            className="lg:hidden"
-          >
-            {showRecords ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </Button>
-        </div>
+        <TooltipProvider delayDuration={1000}>
+          <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowRecords(!showRecords)}
+                  className="lg:hidden"
+                  aria-label={showRecords ? '回到对话框' : '查看思绪记录'}
+                >
+                  <Image
+                    src={showRecords ? '/hide-records.png' : '/records.png'}
+                    alt={showRecords ? '回到对话框' : '查看思绪记录'}
+                    width={24}
+                    height={24}
+                    className="h-5 w-5"
+                    priority
+                  />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {showRecords ? '回到对话框' : '查看思绪记录'}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleReset}
+                  aria-label="新聊天"
+                >
+                  <Image
+                    src="/new-chat.png"
+                    alt="新聊天"
+                    width={24}
+                    height={24}
+                    className="h-5 w-5"
+                    priority
+                  />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>新聊天</TooltipContent>
+            </Tooltip>
+          </div>
+        </TooltipProvider>
       </header>
 
       <div className="flex-1 overflow-hidden min-h-0">
@@ -170,6 +236,7 @@ export default function Home() {
               messages={state.conversationHistory}
               onSendMessage={handleSendMessage}
               isLoading={isLoading}
+              isConversationComplete={state.conversationProgress.isCompleted}
             />
           </div>
 

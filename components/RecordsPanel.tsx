@@ -40,22 +40,22 @@ export function RecordsPanel({ categories }: RecordsPanelProps) {
 
   const handleCopy = async () => {
     const lines: string[] = [`今日睡前思绪-${dateLabel}`]
+    const sectionsToCopy = sections.filter(section => section.items.length > 0)
 
-    sections.forEach((section, sectionIndex) => {
-      lines.push(section.title)
-
-      if (section.items.length === 0) {
-        lines.push(section.emptyText)
-      } else {
+    if (sectionsToCopy.length === 0) {
+      lines.push('今日暂无记录')
+    } else {
+      sectionsToCopy.forEach((section, sectionIndex) => {
+        lines.push(section.title)
         section.items.forEach((item, index) => {
           lines.push(`${index + 1}. ${item}`)
         })
-      }
 
-      if (sectionIndex < sections.length - 1) {
-        lines.push('')
-      }
-    })
+        if (sectionIndex < sectionsToCopy.length - 1) {
+          lines.push('')
+        }
+      })
+    }
 
     const content = lines.join('\n').trim()
 
