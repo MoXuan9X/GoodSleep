@@ -10,10 +10,9 @@ interface ChatBoxProps {
   messages: Message[]
   onSendMessage: (message: string) => Promise<void>
   isLoading: boolean
-  isConversationComplete: boolean
 }
 
-export function ChatBox({ messages, onSendMessage, isLoading, isConversationComplete }: ChatBoxProps) {
+export function ChatBox({ messages, onSendMessage, isLoading }: ChatBoxProps) {
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -30,7 +29,7 @@ export function ChatBox({ messages, onSendMessage, isLoading, isConversationComp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!input.trim() || isSending || isLoading || isConversationComplete) return
+    if (!input.trim() || isSending || isLoading) return
 
     const message = input.trim()
     setInput('')
@@ -87,18 +86,14 @@ export function ChatBox({ messages, onSendMessage, isLoading, isConversationComp
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={
-              isConversationComplete
-                ? '今夜的思绪都整理好啦，安心的睡觉吧，晚安~'
-                : '输入你的想法...'
-            }
+            placeholder="输入你的想法..."
             className="resize-none min-h-[60px] max-h-[120px]"
-            disabled={isSending || isLoading || isConversationComplete}
+            disabled={isSending || isLoading}
           />
           <Button
             type="submit"
             size="icon"
-            disabled={!input.trim() || isSending || isLoading || isConversationComplete}
+            disabled={!input.trim() || isSending || isLoading}
             className="h-[60px] w-[60px] shrink-0"
           >
             {isSending || isLoading ? (

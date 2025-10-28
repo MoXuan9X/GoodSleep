@@ -17,22 +17,6 @@ import {
 } from '@/components/ui/tooltip'
 
 const GREETING_MESSAGE = '你好！我是小安，可以在睡前帮你把脑子里盘旋的事情安顿好，让你轻松入睡。请问怎么称呼你呢？'
-const COMPLETION_KEYWORDS = [
-  '没有了',
-  '没了',
-  '没有其它',
-  '没有其他',
-  '没有别的',
-  '没有什么了',
-  '没有什么别的',
-  '分享完了',
-  '讲完了',
-  '说完了',
-  '结束了',
-  '没有问题了',
-  '没有什么问题了',
-  '晚安'
-]
 
 export default function Home() {
   const [state, setState] = useState<AppState>(INITIAL_STATE)
@@ -71,14 +55,6 @@ export default function Home() {
   }
 
   const handleSendMessage = async (message: string) => {
-    if (state.conversationProgress.isCompleted) {
-      toast({
-        title: '会话已结束',
-        description: '点击“开始新会话”即可重新聊天。'
-      })
-      return
-    }
-
     const userMessage: Message = {
       role: 'user',
       content: message,
@@ -98,10 +74,6 @@ export default function Home() {
       const assistantResponse = await getChatResponse(updatedHistory)
 
       const classificationInput = `用户: ${message}\n小安: ${assistantResponse}`
-      const normalizedMessage = message.replace(/\s/g, '')
-      const isCompletionMessage = COMPLETION_KEYWORDS.some(keyword =>
-        normalizedMessage.includes(keyword)
-      )
       const classification = await classifyMessage(classificationInput)
 
       const assistantMessage: Message = {
@@ -118,11 +90,7 @@ export default function Home() {
             achievements: mergeCategories(prev.categories.achievements, classification.achievements),
             gratitude: mergeCategories(prev.categories.gratitude, classification.gratitude)
           },
-          conversationProgress: {
-            ...prev.conversationProgress,
-            currentCategory: isCompletionMessage ? 'completed' : prev.conversationProgress.currentCategory,
-            isCompleted: prev.conversationProgress.isCompleted || isCompletionMessage
-          }
+          conversationProgress: prev.conversationProgress
         }
 
         saveState(newState)
@@ -236,7 +204,6 @@ export default function Home() {
               messages={state.conversationHistory}
               onSendMessage={handleSendMessage}
               isLoading={isLoading}
-              isConversationComplete={state.conversationProgress.isCompleted}
             />
           </div>
 
