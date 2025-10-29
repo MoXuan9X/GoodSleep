@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { ChatBox } from '@/components/ChatBox'
 import { RecordsPanel } from '@/components/RecordsPanel'
 import { AppState, Message, INITIAL_STATE } from '@/lib/types'
-import { loadState, saveState, clearState } from '@/lib/storage'
+import { loadState, saveState, clearState, getTodayDateKey } from '@/lib/storage'
 import { getChatResponse, classifyMessage } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
@@ -33,9 +33,10 @@ export default function Home() {
         content: GREETING_MESSAGE,
         timestamp: Date.now()
       }
-      const newState = {
+      const newState: AppState = {
         ...savedState,
-        conversationHistory: [greetingMessage]
+        conversationHistory: [greetingMessage],
+        lastSessionDate: getTodayDateKey()
       }
       setState(newState)
       saveState(newState)
@@ -65,7 +66,8 @@ export default function Home() {
 
     setState(prev => ({
       ...prev,
-      conversationHistory: updatedHistory
+      conversationHistory: updatedHistory,
+      lastSessionDate: getTodayDateKey()
     }))
 
     setIsLoading(true)
@@ -75,6 +77,11 @@ export default function Home() {
 
       const classificationInput = `用户: ${message}\n小安: ${assistantResponse}`
       const classification = await classifyMessage(classificationInput)
+      console.log('[Classification Result]', {
+        userMessage: message,
+        assistantResponse,
+        classification
+      })
 
       const assistantMessage: Message = {
         role: 'assistant',
@@ -83,6 +90,8 @@ export default function Home() {
       }
 
       setState(prev => {
+        const todayKey = getTodayDateKey()
+        console.log('[Categories Before Merge]', prev.categories)
         const newState: AppState = {
           conversationHistory: [...updatedHistory, assistantMessage],
           categories: {
@@ -90,8 +99,11 @@ export default function Home() {
             achievements: mergeCategories(prev.categories.achievements, classification.achievements),
             gratitude: mergeCategories(prev.categories.gratitude, classification.gratitude)
           },
-          conversationProgress: prev.conversationProgress
+          conversationProgress: prev.conversationProgress,
+          lastSessionDate: todayKey
         }
+
+        console.log('[Categories After Merge]', newState.categories)
 
         saveState(newState)
         return newState
@@ -117,9 +129,10 @@ export default function Home() {
       timestamp: Date.now()
     }
 
-    const newState = {
+    const newState: AppState = {
       ...INITIAL_STATE,
-      conversationHistory: [greetingMessage]
+      conversationHistory: [greetingMessage],
+      lastSessionDate: getTodayDateKey()
     }
 
     setState(newState)
