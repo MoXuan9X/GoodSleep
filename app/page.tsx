@@ -75,13 +75,7 @@ export default function Home() {
     try {
       const assistantResponse = await getChatResponse(updatedHistory)
 
-      const classificationInput = `用户: ${message}\n小安: ${assistantResponse}`
-      const classification = await classifyMessage(classificationInput)
-      console.log('[Classification Result]', {
-        userMessage: message,
-        assistantResponse,
-        classification
-      })
+      const classification = await classifyMessage(message)
 
       const assistantMessage: Message = {
         role: 'assistant',
@@ -91,19 +85,16 @@ export default function Home() {
 
       setState(prev => {
         const todayKey = getTodayDateKey()
-        console.log('[Categories Before Merge]', prev.categories)
         const newState: AppState = {
           conversationHistory: [...updatedHistory, assistantMessage],
           categories: {
-            unsolved: mergeCategories(prev.categories.unsolved, classification.unsolved),
-            achievements: mergeCategories(prev.categories.achievements, classification.achievements),
-            gratitude: mergeCategories(prev.categories.gratitude, classification.gratitude)
+            pendingThings: mergeCategories(prev.categories.pendingThings, classification.pendingThings),
+            happyThings: mergeCategories(prev.categories.happyThings, classification.happyThings),
+            gratefulThings: mergeCategories(prev.categories.gratefulThings, classification.gratefulThings)
           },
           conversationProgress: prev.conversationProgress,
           lastSessionDate: todayKey
         }
-
-        console.log('[Categories After Merge]', newState.categories)
 
         saveState(newState)
         return newState

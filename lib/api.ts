@@ -28,7 +28,24 @@ const SYSTEM_PROMPT = `### 身份
 - **风格**：像和朋友聊天一样的简短一句话聊天内容
 - **限制**：不要一次性说很多，禁止出现包含括号的内容，不要回复对话内容以外的任何内容`
 
-const CLASSIFICATION_PROMPT = `帮我根据用户说的话，分析用户说的是什么事情，提取重要信息分别记录{{a}}=还没完成或还没解决的代办事情;{{b}}=高兴和有成就感的事情;{{c}}=需要感恩的事情。没有提到则字段先为空。JSON格式。禁止输出其他内容。`
+const CLASSIFICATION_PROMPT = `
+## 角色 
+你是“睡前思绪整理助手”的分类模块，需要把用户当次话语整理成三类记录。请严格输出 JSON（UTF-8，字段顺序固定，禁止额外文本或注释）。
+
+## 分类定义：
+- "pendingThings": “还没解决的事”列表，用来记录未完成、尚未处理的内容。
+- "happyThings": “值得开心的事”列表，用来记录让用户感到开心、满足或有成就感的事情。
+- "gratefulThings": “心中感恩的事”列表，用来记录用户表达感谢、感恩或珍惜的人和事。
+
+## 处理规则：
+1. 提取用户事情的关键信息进行输出，不要记录口水话。还没解决的事情去掉今日、明日之类的描述，因为不确定用户哪些会执行。
+2. 输入可能包含诸如“1. …”“2) …”“① …”等前缀或符号，请先忽略这些标号，再逐条理解。
+3. 遇到“没有…/没做…/还没…”等表达未完成、缺失或担忧的句子，归入 "pendingThings"。
+4. 同一句如果提到多件事，请拆成多条；保持原意，可适度精简描述。
+5. 若某一类没有内容，请返回空数组 []，不要放空字符串或 null。
+
+## 输出要求
+1. 输出必须是合法 JSON格式：  {"pendingThings":[...], "happyThings":[...], "gratefulThings":[...] }，除 JSON 外不要输出任何其他文字。`
 
 const API_ENDPOINT = 'https://api.siliconflow.cn/v1/chat/completions'
 
@@ -132,29 +149,35 @@ export async function classifyMessage(userMessage: string): Promise<Categories> 
 
     try {
       const parsed = JSON.parse(cleanedContent)
-      const pickValue = (obj: Record<string, unknown>, key: string) => {
-        return obj?.[key] ?? obj?.[`{{${key}}}`]
+      const pickValue = (obj: Record<string, unknown>, keys: string[]) => {
+        for (const key of keys) {
+          const direct = obj?.[key]
+          if (direct !== undefined) {
+            return direct
+          }
+        }
+        return undefined
       }
 
       return {
-        unsolved: normalizeToArray(pickValue(parsed, 'a')),
-        achievements: normalizeToArray(pickValue(parsed, 'b')),
-        gratitude: normalizeToArray(pickValue(parsed, 'c'))
+        pendingThings: normalizeToArray(pickValue(parsed, ['pendingThings'])),
+        happyThings: normalizeToArray(pickValue(parsed, ['happyThings'])),
+        gratefulThings: normalizeToArray(pickValue(parsed, ['gratefulThings']))        
       }
     } catch (parseError) {
       console.error('Error parsing classification response:', parseError, cleanedContent)
       return {
-        unsolved: [],
-        achievements: [],
-        gratitude: []
+        pendingThings: [],
+        happyThings: [],
+        gratefulThings: []
       }
     }
   } catch (error) {
     console.error('Error classifying message:', error)
     return {
-      unsolved: [],
-      achievements: [],
-      gratitude: []
+      pendingThings: [],
+      happyThings: [],
+      gratefulThings: []
     }
   }
 }

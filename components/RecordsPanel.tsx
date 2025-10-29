@@ -24,17 +24,17 @@ export function RecordsPanel({ categories }: RecordsPanelProps) {
     {
       title: '还没解决的事',
       emptyText: '心中暂无牵挂',
-      items: categories.unsolved
+      items: categories.pendingThings
     },
     {
       title: '值得开心的事',
       emptyText: '美好待你发现',
-      items: categories.achievements
+      items: categories.happyThings
     },
     {
       title: '心中感恩的事',
       emptyText: '留下幸运瞬间',
-      items: categories.gratitude
+      items: categories.gratefulThings
     }
   ]
 
