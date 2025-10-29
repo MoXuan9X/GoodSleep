@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Message } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2, Send } from 'lucide-react'
+import { Send, Mic } from 'lucide-react'
 
 interface ChatBoxProps {
   messages: Message[]
@@ -84,27 +84,31 @@ export function ChatBox({ messages, onSendMessage, isLoading }: ChatBoxProps) {
             </div>
           )
         })}
-        {isLoading && !hasStreamingMessage && (
-          <div className="flex justify-start">
-            <div className="bg-gray-100 rounded-2xl px-4 py-3">
-              <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
-            </div>
-          </div>
-        )}
         <div ref={messagesEndRef} />
       </div>
 
       <div className="border-t bg-white p-4">
         <form onSubmit={handleSubmit} className="flex gap-2">
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="输入你的想法..."
-            className="resize-none min-h-[60px] max-h-[120px]"
-            disabled={isSending || isLoading}
-          />
+          <div className="relative flex-1">
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="输入你的想法..."
+              className="w-full resize-none min-h-[60px] max-h-[120px] pr-14 focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-200 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-gray-200"
+              disabled={isSending || isLoading}
+            />
+            <button
+              type="button"
+              className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-700 transition-colors hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="语音输入"
+              title="敬请期待~"
+              disabled={isSending || isLoading}
+            >
+              <Mic className="h-6 w-6" strokeWidth={2.1} />
+            </button>
+          </div>
           <Button
             type="submit"
             size="icon"
