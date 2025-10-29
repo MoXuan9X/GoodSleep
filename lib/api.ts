@@ -79,7 +79,12 @@ const normalizeToArray = (value: unknown): string[] => {
   return []
 }
 
-export async function getChatResponse(conversationHistory: Message[]): Promise<string> {
+type DeltaHandler = (delta: string) => Promise<void> | void
+
+export async function streamChatResponse(
+  conversationHistory: Message[],
+  onDelta?: DeltaHandler
+): Promise<string> {
   try {
     const response = await fetch(API_ENDPOINT, {
       method: 'POST',
@@ -94,9 +99,12 @@ export async function getChatResponse(conversationHistory: Message[]): Promise<s
             role: 'system',
             content: SYSTEM_PROMPT
           },
-          ...conversationHistory
+          ...conversationHistory.map(message => ({
+            role: message.role,
+            content: message.content
+          }))
         ],
-        stream: false,
+        stream: true,
         max_tokens: 4096,
         temperature: 0.7,
         top_p: 0.7
@@ -107,8 +115,112 @@ export async function getChatResponse(conversationHistory: Message[]): Promise<s
       throw new Error(`API request failed: ${response.status}`)
     }
 
-    const data = await response.json()
-    return data.choices[0]?.message?.content || '抱歉，我遇到了一些问题，请再说一次好吗？'
+    if (!response.body) {
+      throw new Error('ReadableStream not supported in this environment')
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder('utf-8')
+    let buffer = ''
+    let fullContent = ''
+    let isDone = false
+
+    while (!isDone) {
+      const { value, done } = await reader.read()
+      if (done) {
+        break
+      }
+
+      buffer += decoder.decode(value, { stream: true })
+      const events = buffer.split('\n\n')
+      buffer = events.pop() ?? ''
+
+      for (const event of events) {
+        const lines = event.split('\n')
+
+        for (const rawLine of lines) {
+          const line = rawLine.trim()
+          if (!line.startsWith('data:')) {
+            continue
+          }
+
+          const dataContent = line.slice(5).trim()
+          if (!dataContent) {
+            continue
+          }
+
+          if (dataContent === '[DONE]') {
+            isDone = true
+            break
+          }
+
+          try {
+            const parsed = JSON.parse(dataContent)
+            const delta = parsed.choices?.[0]?.delta
+            if (!delta) {
+              continue
+            }
+
+            const pieces = [
+              typeof delta.content === 'string' ? delta.content : '',
+              typeof delta.reasoning_content === 'string' ? delta.reasoning_content : ''
+            ].join('')
+
+            if (pieces) {
+              fullContent += pieces
+              if (onDelta) {
+                await onDelta(pieces)
+              }
+            }
+          } catch (parseError) {
+            console.error('Error parsing stream chunk:', parseError, dataContent)
+          }
+        }
+
+        if (isDone) {
+          break
+        }
+      }
+    }
+
+    if (!isDone) {
+      const remaining = buffer.trim()
+      if (remaining && remaining !== '[DONE]') {
+        try {
+          const parsed = JSON.parse(remaining.replace(/^data:\s*/, ''))
+          const delta = parsed.choices?.[0]?.delta
+          if (delta) {
+            const tailPieces = [
+              typeof delta.content === 'string' ? delta.content : '',
+              typeof delta.reasoning_content === 'string' ? delta.reasoning_content : ''
+            ].join('')
+            if (tailPieces) {
+              fullContent += tailPieces
+              if (onDelta) {
+                await onDelta(tailPieces)
+              }
+            }
+          }
+        } catch (error) {
+          // Swallow JSON parse errors for trailing buffer
+        }
+      }
+    }
+
+    return fullContent || '抱歉，我遇到了一些问题，请再说一次好吗？'
+  } catch (error) {
+    console.error('Error streaming chat API:', error)
+    throw error
+  }
+}
+
+export async function getChatResponse(conversationHistory: Message[]): Promise<string> {
+  try {
+    let combined = ''
+    await streamChatResponse(conversationHistory, delta => {
+      combined += delta
+    })
+    return combined || '抱歉，我遇到了一些问题，请再说一次好吗？'
   } catch (error) {
     console.error('Error calling chat API:', error)
     throw error

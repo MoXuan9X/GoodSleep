@@ -17,6 +17,9 @@ export function ChatBox({ messages, onSendMessage, isLoading }: ChatBoxProps) {
   const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const hasStreamingMessage = messages.some(
+    message => message.role === 'assistant' && Boolean(message.isStreaming)
+  )
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -53,23 +56,35 @@ export function ChatBox({ messages, onSendMessage, isLoading }: ChatBoxProps) {
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
+        {messages.map((message, index) => {
+          const isAssistantMessage = message.role === 'assistant'
+          const isAssistantStreaming = isAssistantMessage && Boolean(message.isStreaming)
+          const showBreathingDot = isAssistantStreaming && !message.content
+
+          return (
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                message.role === 'user'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-900'
-              }`}
+              key={index}
+              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+              {showBreathingDot ? (
+                <span className="typing-indicator-dot text-gray-900 ml-4" />
+              ) : (
+                <div
+                  className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                    message.role === 'user'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 text-gray-900'
+                  }`}
+                >
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                    {message.content}
+                  </p>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
-        {isLoading && (
+          )
+        })}
+        {isLoading && !hasStreamingMessage && (
           <div className="flex justify-start">
             <div className="bg-gray-100 rounded-2xl px-4 py-3">
               <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
@@ -97,7 +112,11 @@ export function ChatBox({ messages, onSendMessage, isLoading }: ChatBoxProps) {
             className="h-[60px] w-[60px] shrink-0"
           >
             {isSending || isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <span className="button-typing-dots">
+                <span />
+                <span />
+                <span />
+              </span>
             ) : (
               <Send className="h-5 w-5" />
             )}

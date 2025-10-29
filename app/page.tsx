@@ -6,7 +6,7 @@ import { ChatBox } from '@/components/ChatBox'
 import { RecordsPanel } from '@/components/RecordsPanel'
 import { AppState, Message, INITIAL_STATE } from '@/lib/types'
 import { loadState, saveState, clearState, getTodayDateKey } from '@/lib/storage'
-import { getChatResponse, classifyMessage } from '@/lib/api'
+import { streamChatResponse, classifyMessage } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -56,37 +56,107 @@ export default function Home() {
   }
 
   const handleSendMessage = async (message: string) => {
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+    const typingDelayFor = (char: string) => {
+      if (char === ' ' || char === '\n') return 0
+      return 18
+    }
+
     const userMessage: Message = {
       role: 'user',
       content: message,
       timestamp: Date.now()
     }
 
-    const updatedHistory = [...state.conversationHistory, userMessage]
+    const typingPlaceholder: Message = {
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      isStreaming: true
+    }
 
-    setState(prev => ({
-      ...prev,
-      conversationHistory: updatedHistory,
-      lastSessionDate: getTodayDateKey()
-    }))
+    let historyForRequest: Message[] = []
+
+    setState(prev => {
+      const historyWithUser = [...prev.conversationHistory, userMessage]
+      historyForRequest = historyWithUser
+      return {
+        ...prev,
+        conversationHistory: [...historyWithUser, typingPlaceholder],
+        lastSessionDate: getTodayDateKey()
+      }
+    })
 
     setIsLoading(true)
 
-    try {
-      const assistantResponse = await getChatResponse(updatedHistory)
-
-      const classification = await classifyMessage(message)
-
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: assistantResponse,
-        timestamp: Date.now()
+    const classificationPromise = classifyMessage(message).catch(error => {
+      console.error('Error classifying message:', error)
+      return {
+        pendingThings: [],
+        happyThings: [],
+        gratefulThings: []
       }
+    })
+
+    try {
+      let streamedContent = ''
+
+      const updateStreamingMessage = (content: string, isStreaming: boolean) => {
+        setState(prev => {
+          const history = [...prev.conversationHistory]
+          const lastIndex = history.length - 1
+
+          if (lastIndex >= 0 && history[lastIndex].role === 'assistant') {
+            history[lastIndex] = {
+              ...history[lastIndex],
+              content,
+              isStreaming,
+              timestamp: history[lastIndex].timestamp
+            }
+          }
+
+          return {
+            ...prev,
+            conversationHistory: history
+          }
+        })
+      }
+
+      const requestHistory = historyForRequest.length
+        ? historyForRequest
+        : [...state.conversationHistory, userMessage]
+
+      const assistantResponse = await streamChatResponse(requestHistory, async delta => {
+        for (const char of delta) {
+          streamedContent += char
+          updateStreamingMessage(streamedContent, true)
+          const delay = typingDelayFor(char)
+          if (delay > 0) {
+            await sleep(delay)
+          }
+        }
+      })
+
+      updateStreamingMessage(assistantResponse, false)
+
+      const classification = await classificationPromise
 
       setState(prev => {
         const todayKey = getTodayDateKey()
+        const history = [...prev.conversationHistory]
+        const lastIndex = history.length - 1
+
+        if (lastIndex >= 0 && history[lastIndex].role === 'assistant') {
+          history[lastIndex] = {
+            ...history[lastIndex],
+            content: assistantResponse,
+            isStreaming: false,
+            timestamp: Date.now()
+          }
+        }
+
         const newState: AppState = {
-          conversationHistory: [...updatedHistory, assistantMessage],
+          conversationHistory: history,
           categories: {
             pendingThings: mergeCategories(prev.categories.pendingThings, classification.pendingThings),
             happyThings: mergeCategories(prev.categories.happyThings, classification.happyThings),
@@ -101,6 +171,28 @@ export default function Home() {
       })
     } catch (error) {
       console.error('Error sending message:', error)
+      setState(prev => {
+        const history = [...prev.conversationHistory]
+        const lastIndex = history.length - 1
+
+        if (lastIndex >= 0 && history[lastIndex].role === 'assistant') {
+          history[lastIndex] = {
+            role: 'assistant',
+            content: '抱歉，我遇到了一些问题，请再说一次好吗？',
+            timestamp: Date.now()
+          }
+        }
+
+        const newState: AppState = {
+          conversationHistory: history,
+          categories: prev.categories,
+          conversationProgress: prev.conversationProgress,
+          lastSessionDate: getTodayDateKey()
+        }
+
+        saveState(newState)
+        return newState
+      })
       toast({
         title: '发送失败',
         description: '网络连接出现问题，请检查网络后重试',
