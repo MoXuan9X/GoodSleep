@@ -5,6 +5,7 @@ import { Message } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Send, Mic } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface ChatBoxProps {
   messages: Message[]
@@ -99,15 +100,23 @@ export function ChatBox({ messages, onSendMessage, isLoading }: ChatBoxProps) {
               className="w-full resize-none min-h-[60px] max-h-[120px] pr-14 focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-200 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-gray-200"
               disabled={isSending || isLoading}
             />
-            <button
-              type="button"
-              className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-700 transition-colors hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed"
-              aria-label="语音输入"
-              title="敬请期待~"
-              disabled={isSending || isLoading}
-            >
-              <Mic className="h-6 w-6" strokeWidth={2.1} />
-            </button>
+            <TooltipProvider delayDuration={500}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-700 transition-colors hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label="语音输入"
+                    disabled={isSending || isLoading}
+                  >
+                    <Mic className="h-6 w-6" strokeWidth={2.1} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  敬请期待~
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           <Button
             type="submit"
