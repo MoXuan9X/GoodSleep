@@ -264,7 +264,13 @@ export function ChatBox({ messages, onSendMessage, isLoading }: ChatBoxProps) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isRecording ? '小安正在听...' : '告诉小安你的想法...'}
+              placeholder={
+                isTranscribing
+                  ? '小安正在认真思考哦~'
+                  : isRecording
+                    ? '小安正在听...'
+                    : '告诉小安你的想法...'
+              }
               className={`w-full resize-none min-h-[60px] max-h-[120px] pr-[120px] focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-200 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-gray-200 placeholder:text-gray-400 transition-all ${
                 isRecording || isTranscribing
                   ? 'opacity-0 pointer-events-none border-transparent'
